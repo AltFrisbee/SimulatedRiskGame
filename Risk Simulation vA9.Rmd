@@ -1,0 +1,669 @@
+---
+title: "Another Risk simulation vA0"
+author: "Bill & Edward Prisbrey"
+date: "6/17/2023"
+output: html_document
+---
+
+No good reason why, but I'm making another Risk simulation.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+OBJECTIVES:
+
+  * Calculate the odds of defeating armies of various sizes
+  * Calculate the typical loss of invading vs defending armies
+  * Calculate the number of soldiers required including occupying territories
+  
+  
+```{r roll.dice}
+
+# start with a function for rolling dice
+
+library(magrittr)
+#library(neo4r)
+
+rollDice <- function(dice) {
+  
+  # where dice is the count of dice
+  
+  # this returns a vector with a length the number of dice.
+  # it orders it from largest to smallest
+  
+  roll <- sample(1:6, dice, replace = TRUE) %>%
+    "["(order(., decreasing = TRUE))
+  
+  return(roll)
+  
+}
+
+# next, let's create a frame with rolls
+
+multiRoll <- function(dice, roll) {
+  
+  # where dice is the number of dice
+  # where roll is the number of dice rolls
+  
+  # this returns a dataframe where each row is an individual dice roll,
+  # or where the rows are the number of rolls and the columns are the number of dice.
+  
+  roll.list <- lapply(1:roll, function(x) rollDice(dice))
+ 
+  roll.frame <- do.call(rbind, roll.list)
+  
+  return(roll.frame)
+   
+}
+  
+multiRoll(3,100000) %>%
+  apply(.,2,mean)
+
+# [1] 4.95631 3.49749 2.03939
+
+# Recall that this is ordered.  The middle one is the expected mean, and then you have high and low around that.  mean(1:6) results in 3.5
+
+# Now align an "attack" frame with a "defend" frame, and calculate a vector of attack loss and defend loss
+
+# let's do this with a compare function.
+
+# let's call the compare function a "fight"
+
+fight <- function(attacker, defender) {
+  
+  # where attacker is a vector representing the attacking dice
+  # where defender is a vector representing the defending dice
+  
+  # this function compares two dice rolls, and aligns them (highest to lowest) and returns how many attackers are lost and how many defenders are lost
+  
+  comparison <- min(c(length(defender),length(attacker)))
+
+  attackerLoss <- sum(defender[1:comparison] >= attacker[1:comparison])
+  defenderLoss <- comparison - attackerLoss  
+ 
+  results <- c(attackerLoss, defenderLoss)
+  
+  names(results) <- c("attack.loss","defend.loss")
+  
+  return(results)
+  
+   
+}
+
+# ok, now.... do I call "fight" over and over, and sum the losses?
+# or do I call "fight" on two frames?
+# Or both?
+
+rolls <- 100000
+game.list <- lapply(1:rolls, function(x) {fight(rollDice(3),rollDice(2))})
+game.frame <- do.call(rbind, game.list)
+
+#> colSums(game.frame)
+#attack.loss defend.loss 
+#     920579     1079421 
+
+#> colSums(game.frame)[1]/colSums(game.frame)[2]
+#attack.loss 
+#  0.8528452
+
+# really?  attacker loses 85% of the defender loss?  Really?
+
+# that's not inconsistent with needing 2x to attack.
+
+# let's test this.
+
+# this says if 4 armies are defending, so I want them to lose 4, then attacker loss is 0.85*4 = 3.4.  Or, rounding up, I need four armies to defeat four armies.
+
+# This doesn't take into account the loss of dice.
+
+rolls <- 100000
+game.list2 <- lapply(1:rolls, function(x) {fight(rollDice(2),rollDice(2))})
+game.frame2 <- do.call(rbind, game.list2)
+
+ colSums(game.frame2)[1]/colSums(game.frame2)[2]
+#attack.loss 
+#   1.566966 
+
+battle <- function(invadingArmy, defendingArmy, printResults) {
+  
+  # This returns a vector with the following values:
+  # IA are the number of Invading Armies remaining
+  # DA are the number of Defending Armies remaining
+  # TP is the number of turns or rolls or fights it took
+  # AW is whether the attacker won (0 = FALSE, 1 = TRUE)
+
+  # if printResults = 1, then it shows the values per roll or fight or turn
+  
+  counter <- 0
+  AtCal1 <- 0 # Attacking Calculation to get three dice rolls per fight command
+  cal1 <- 0 # Defending Calculation to get two dice rolls per fight command
+  while(invadingArmy>1){
+    counter <- counter + 1
+    
+    if(invadingArmy>3) {
+      AtCal1 <- invadingArmy/3
+      round(AtCal1,0)
+    }
+    
+    if(defendingArmy > 2) {
+      cal1 <- defendingArmy/2
+      round(cal1,0)
+    }
+    
+    AtCal2 <- AtCal1-1
+    AtCal3 <- AtCal1-AtCal2
+    attackingArmy <- AtCal3*3
+    cal2 <- cal1-1
+    cal3 <- cal1-cal2
+    atDefenseArmy <- cal3*2
+    
+    if(attackingArmy > 0 && defendingArmy <= 2) {
+      
+      attacker.roll <- rollDice(attackingArmy)
+      defender.roll <- rollDice(defendingArmy)
+      
+      fightResults <- fight(attacker.roll, defender.roll)
+    } else {
+      if(invadingArmy <= 3 && defendingArmy <= 2) {
+        
+      attacker.roll <- rollDice(invadingArmy)
+      defender.roll <- rollDice(defendingArmy)
+
+        
+        fightResults <- fight(attacker.roll, defender.roll)
+        
+      } else {
+        
+        if(attackingArmy > 0 && defendingArmy > 2) {
+          
+      attacker.roll <- rollDice(attackingArmy)
+      defender.roll <- rollDice(atDefenseArmy)
+          
+          fightResults <- fight(attacker.roll, defender.roll)
+          
+        } else {
+          
+          if(invadingArmy <= 3 && defendingArmy > 2) {
+            
+            
+              attacker.roll <- rollDice(invadingArmy)
+              defender.roll <- rollDice(atDefenseArmy)
+
+            
+            fightResults <- fight(attacker.roll, defender.roll)
+          }
+        }
+      }
+    }
+      
+     #lowers number of armies
+      invadingArmy <- invadingArmy-fightResults[1]
+      defendingArmy <- defendingArmy-fightResults[2]
+    
+   #updates you if you wanted to be updated
+    if(printResults == 1) {
+      
+      print(counter)
+      print(paste("Attacker roll was", paste(attacker.roll, collapse = " ")))
+      print(paste("Defender roll was", paste(defender.roll, collapse = " ")))
+      print(paste("Invading army is", invadingArmy))
+      print(paste("Defending army is", defendingArmy))
+    }
+    
+    #checks if defending army is to low to continue
+    if(defendingArmy <= 0) {defendingArmy <- 0; break } 
+    if(counter>20) { break }
+  
+  }
+  
+  if(invadingArmy <= 1) {
+    invadingArmy <- 1
+  }
+  
+  #checks if attacking army won or not
+  if(defendingArmy >= invadingArmy) {
+    attackWin <- 0
+  } else {
+    attackWin <- 1
+  }
+  
+  #puts results into a variable
+  BaRe <- c(invadingArmy, defendingArmy, counter, attackWin)
+  names(BaRe) <- c("IA","DA","TP","AW")
+  return(BaRe)
+}
+
+# check
+
+checkBattle <- lapply(1:1000, function(x){battle(invadingArmy = 3,
+                                  defendingArmy = 3,
+                                  printResults = FALSE)})
+jLo <- do.call(rbind, checkBattle)
+
+
+shouldBattle <- function(myArmy,enemyArmy) {
+    
+    sb_df <- data.frame(do.call(rbind, lapply(1:10000, function(x) {battle(myArmy, enemyArmy, 0)})))
+    return(mean(sb_df[,4]))
+}
+
+```
+
+
+```{r battle.grid}
+
+lapply(2:10, function(x) {shouldBattle(x,1)})
+
+battle.list <- lapply(1:10, function(y) {sapply(1:10, function(x) {shouldBattle(x,y)})})
+
+battle.grid <- do.call(rbind, battle.list)
+
+battle.matrix <- do.call(rbind, battle.list)
+
+```
+
+
+```{r borders}
+
+continents <- list("North.America" = c("Alaska", 
+                                     "Northwest Territory",
+                                     "Greenland",
+                                     "Alberta",
+                                     "Ontario",
+                                     "Eastern Canada",
+                                     "Western United States",
+                                     "Eastern United States",
+                                     "Central America"
+                                    ),
+                     "South.America" = c("Venezuela",
+                                       "Brazil",
+                                       "Peru",
+                                       "Argentina"
+                                       ),
+                   "Africa" = c("North Africa",
+                              "Egypt",
+                              "East Africa",
+                              "Central Africa",
+                              "South Africa",
+                              "Madagascar"),
+                   "Europe" = c("Iceland",
+                              "Scandinavia",
+                              "Russia",
+                              "Great Britain",
+                              "Northern Europe",
+                              "Western Europe",
+                              "Southern Europe"),
+                   "Asia" = c("Middle East",
+                            "Afghanistan",
+                            "Ural",
+                            "Siberia",
+                            "Yakutsk",
+                            "Kamchatka",
+                            "India",
+                            "China",
+                            "Mongolia",
+                            "Irkutsk",
+                            "Southeast Asia",
+                            "Japan"),
+                   "Australia" = c("Indonesia",
+                                 "New Guinea",
+                                 "Western Australia",
+                                 "Eastern Australia")
+)
+  
+borders <- list("Alaska" = c("Northwest Territory",
+                           "Alberta",
+                           "Kamchatka"),
+                "Northwest Territory" = c(
+                  "Alaska",
+                  "Alberta",
+                  "Ontario",
+                  "Greenland"),
+                "Greenland" = c("Northwest Territory",
+                              "Ontario",
+                              "Eastern Canada",
+                              "Iceland"),
+                "Alberta" = c("Alaska",
+                            "Northwest Territory",
+                            "Ontario",
+                            "Western United States"),
+                "Ontario" = c("Alberta",
+                            "Northwest Territory",
+                            "Greenland",
+                            "Eastern Canada",
+                            "Eastern United States",
+                            "Western United States"),
+                "Eastern Canada" = c("Eastern United States",
+                                     "Ontario",
+                                     "Greenland"),
+                "Western United States" = c("Alberta",
+                                            "Ontario",
+                                            "Eastern United States",
+                                            "Central America"),
+                "Eastern United States" = c("Western United States",
+                                            "Ontario",
+                                            "Eastern Canada",
+                                            "Central America"),
+                "Central America" = c("Western United States",
+                                      "Eastern United States",
+                                      "Venezuela"),
+                "Venezuela" = c("Central America",
+                              "Brazil",
+                              "Peru"),
+                "Brazil" = c("Venezuela",
+                           "North Africa",
+                           "Argentina",
+                           "Peru"),
+                "Peru" = c("Venezuela",
+                         "Brazil",
+                         "Argentina"),
+                "Argentina" = c("Peru",
+                              "Brazil"),
+                "North Africa" = c("Brazil",
+                                   "Western Europe",
+                                   "Southern Europe",
+                                   "Egypt",
+                                   "East Africa",
+                                   "Central Africa"),
+                "Egypt" = c("North Africa",
+                            "Southern Europe",
+                            "Middle East",
+                            "East Africa"),
+                "East Africa" = c("North Africa",
+                                  "Egypt",
+                                  "Middle East",
+                                  "Madagascar",
+                                  "South Africa",
+                                  "Central Africa"),
+                "Central Africa" = c("North Africa",
+                                     "East Africa",
+                                     "South Africa"),
+                "South Africa" = c("Central Africa",
+                                   "East Africa",
+                                   "Madagascar"),
+                "Madagascar" = c("South Africa",
+                                 "East Africa"),
+                "Indonesia" = c("Southeast Asia",
+                              "New Guinea",
+                              "Western Australia"),
+                "New Guinea" = c("Indonesia",
+                                 "Eastern Australia"),
+                "Eastern Australia" = c("Western Australia",
+                                        "New Guinea"),
+                
+                "Western Australia" = c("Indonesia",
+                                        "Eastern Australia"),
+                "Middle East" = c("Egypt",
+                                  "Southern Europe",
+                                  "Russia",
+                                  "Afghanistan",
+                                  "India",
+                                  "East Africa"),
+                "India" = c("Middle East",
+                            "Afghanistan",
+                            "China",
+                            "Southeast Asia"),
+                "Southeast Asia" = c("India",
+                                     "China",
+                                     "Indonesia"),
+                "Afghanistan" = c("Russia",
+                                "Ural",
+                                "China",
+                                "India",
+                                "Middle East"),
+                "China" = c("Afghanistan",
+                          "Ural",
+                          "Siberia",
+                          "Mongolia",
+                          "Southeast Asia",
+                          "India"),
+                "Ural" = c("Russia",
+                         "Siberia",
+                         "China",
+                         "Afghanistan"),
+                "Siberia" = c("Ural",
+                            "Yakutsk",
+                            "Irkutsk",
+                            "Mongolia",
+                            "China"),
+                "Yakutsk" = c("Siberia",
+                            "Kamchatka",
+                            "Irkutsk"),
+                "Irkutsk" = c("Siberia",
+                            "Yakutsk",
+                            "Kamchatka",
+                            "Mongolia"),
+                "Mongolia" = c("China",
+                             "Siberia",
+                             "Irkutsk",
+                             "Kamchatka",
+                             "Japan"),
+                "Japan" = c("Mongolia",
+                          "Kamchatka"),
+                "Kamchatka" = c("Japan",
+                              "Mongolia",
+                              "Irkutsk",
+                              "Yakutsk",
+                              "Alaska"),
+                "Iceland" = c("Greenland",
+                            "Scandinavia",
+                            "Great Britain"),
+                "Scandinavia" = c("Iceland",
+                                "Russia",
+                                "Northern Europe",
+                                "Great Britain"),
+                "Russia" = c("Scandinavia",
+                           "Ural",
+                           "Afghanistan",
+                           "Middle East",
+                           "Southern Europe",
+                           "Northern Europe"),
+                "Great Britain" = c("Iceland",
+                                    "Scandinavia",
+                                    "Northern Europe",
+                                    "Western Europe"),
+                "Northern Europe" = c("Great Britain",
+                                      "Iceland",
+                                      "Scandinavia",
+                                      "Russia",
+                                      "Southern Europe",
+                                      "Western Europe"),
+                "Western Europe" = c("Great Britain",
+                                     "Northern Europe",
+                                     "Southern Europe",
+                                     "North Africa"),
+                "Southern Europe" = c("Western Europe",
+                                      "Northern Europe",
+                                      "Russia",
+                                      "Middle East",
+                                      "Egypt",
+                                      "North Africa")
+          
+                        
+                )
+  
+RG <- graph_from_adjacency_matrix(unlist(borders))
+plot(RG)
+
+
+# check
+length(borders) # 41 # FIXED #42
+
+sapply(continents, function(x) {all(x %in% names(borders))}) # All true
+
+# ok, fun.
+
+# now. . . .
+
+# now what . . . 
+
+# let's clean up that battle function
+
+```
+
+```{r develop.battle}
+
+# In this section I'm going to re-write the battle function
+# to include thresholds.
+
+battleSim <- function(attackCount, defendCount, risk.threshold = 0.5, battle.matrix) {
+  
+  # Check the size of the battle.matrix.  If it's too small,
+  # then populate a large-enough battle frame with win probabilities of zero
+  
+  if (defendCount > nrow(battle.matrix) | attackCount > ncol(battle.matrix)) {
+    
+    # create a dataframe of the correct size
+    expanded.matrix <- matrix(0, nrow = defendCount, ncol = attackCount)
+    
+    # assign the current frame as available
+    expanded.matrix[1:nrow(battle.matrix), 1:ncol(battle.matrix)] <- battle.matrix
+    
+    #re-assign the battle.matrix
+    battle.matrix <- expanded.matrix
+    
+  }
+  
+  # look up the win odds in the battle.matrix
+  
+  if (battle.matrix[defendCount, attackCount] < risk.threshold) {
+    print(paste("Wining odds of", battle.matrix[defendCount, attackCount], "below threshold of", risk.threshold));
+    return()}
+  
+  results.list <- vector(mode = "list", length = 1000)
+  counter <- 0
+  while (attackCount > 1 & 
+         defendCount > 0 & 
+         battle.matrix[defendCount, attackCount] >= risk.threshold) {
+    counter <- counter + 1 #increase the counter
+    
+    # establish the number of dice to use
+    if(attackCount >=4) {attack.dice <- 3}
+    if(attackCount < 4) {attack.dice <- attackCount - 1}
+    
+    if(defendCount >=2) {defend.dice <- 2}
+    if(defendCount ==1) {defend.dice <- 1}
+    
+    # roll the dice
+    attacker.roll <- rollDice(attack.dice)
+    defender.roll <- rollDice(defend.dice)
+    
+    # compare the dice
+    adj <- fight(attacker.roll, defender.roll)
+    
+    # adjust the army totals
+    attackCount <- attackCount-adj[[1]]
+    defendCount <- defendCount-adj[[2]]
+    
+    # determine an attacker win and bring defend count back up to zero
+    attackerWin <- FALSE
+    if (defendCount <= 0) {attackerWin <- TRUE; defendCount <- 0}
+    
+    # keep track of the play
+    results.list[[counter]] <- list(attackRoll = attacker.roll,
+                                    defendRoll = defender.roll,
+                                    adj = adj,
+                                    new.count = c("attacking armies" = attackCount,
+                                                  "defending armies" = defendCount),
+                                    win.probability = battle.matrix[defendCount, attackCount],
+                                    attack.win = attackerWin
+                                    )
+    
+    if (attackerWin == TRUE) {break}
+  }
+  
+  results.list <- results.list[!sapply(results.list, is.null)]
+  
+  return(results.list)
+  
+}
+
+# ok, I like that.
+# however, I don't have a record of this winning
+
+# I guess I can set the threshold to 0
+
+# now it will get a little trickier to extract the win percentage
+
+# All kinds of trouble-shooting, and honestly I like where we are.
+
+# time to show Edward
+# and run a simulation and try to extract the win probabilities
+
+# The trick after I run the simulation will be to extract what I need out of the resulting list of lists. !
+# It'll be some list!
+
+
+# the new feature to expand the matrix is throwing an error when it is not square.
+
+> battleSim(11,15,battle.matrix = battle.frame, risk.threshold = 0)
+Error in battle.matrix[defendCount, attackCount] : 
+  subscript out of bounds
+
+```
+
+```{r determine.odds}
+
+odds <- lapply(1:10, function(x) {battleSim(5,5,battle.matrix = battle.matrix, risk.threshold = 0) })
+
+
+
+odds[[1]][[2]][["attack.win"]]
+
+odds[[2]][[3]][["attack.win"]]
+
+# so, like first I need to determine how long each sublist it
+
+sapply(odds, length)
+
+sapply(odds, function(x) {x[[length(x)]][["attack.win"]]  }) %>% sum %>% "/"(.,length(odds)) # that's the win percentage
+
+# let's do it a little longer
+
+odds <- lapply(1:100000, function(x) {battleSim(5,5,battle.matrix = battle.matrix, risk.threshold = 0) })
+
+sapply(odds, function(x) {x[[length(x)]][["attack.win"]]  }) %>% sum %>% "/"(.,length(odds))
+
+#0.3575
+
+# looking pretty good . . . now, how do I populate the entire grid?
+# make a new battle frame?
+
+startTime <- Sys.time()
+# updatedOdds <- matrix(nrow = 15, ncol = 15) 
+
+for (defence in 4:15) {
+  for (offence in 11:15) {
+    
+    simulation.runs <- 100000
+
+updatedOdds[defence,offence] <- lapply(1:simulation.runs, function(x) {battleSim(offence,defence,battle.matrix = matrix(0), risk.threshold = 0) }) %>% sapply(., function(x) {x[[length(x)]][["attack.win"]]  }) %>% sum %>% "/"(.,simulation.runs)
+
+}
+
+}
+
+endTime <- Sys.time()
+
+print(endTime - startTime)
+
+print(updatedOdds)
+
+saveRDS(updatedOdds, "C:/Users/u0693875/Documents/Personal/Edward/Risk Simulation/BattleOdds.rds" )
+
+# do I want to make this bigger, and start increasing by 5?
+# like, show 20,25,30,35,40 ?
+
+```
+
+```{r plot.odds}
+
+plot(updatedOdds[,2], type="b", ylim = c(0,1))
+
+for(army in 3:15){
+lines(updatedOdds[,army], type = "b")}
+
+# would like to describe these lines with an equation.
+```
+
