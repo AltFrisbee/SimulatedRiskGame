@@ -74,3 +74,36 @@ plot(UG)
 plot(G2)
 plot(CG)
 ```
+
+```{r Combining South and North America}
+# Load required library
+library(igraph)
+
+# Create the North America graph
+NAC <- data.frame(
+  from = c("Alaska", "Alaska", "Northwest Territory", "Northwest Territory", "Northwest Territory", "Alberta", "Alberta", "Ontario", "Ontario", "Ontario", "Ontario", "Eastern Canada", "Eastern Canada", "Western United States", "Western United States", "Eastern United States"), 
+  to = c("Alberta", "Northwest Territory", "Alberta", "Greenland", "Ontario", "Ontario", "Western United States", "Western United States", "Eastern United States", "Eastern Canada", "Greenland", "Greenland", "Eastern United States", "Eastern United States", "Central America", "Central America")
+)
+
+NAG <- graph_from_data_frame(d=NAC, directed=F)
+
+# Create the South America graph excluding Central America
+SAL <- data.frame(
+  from = c("Venezuela", "Brazil", "Brazil", "Peru", "Venezuela"),
+  to = c("Brazil", "Peru", "Argentina", "Argentina", "Peru")
+)
+SAG <- graph_from_data_frame(d = SAL, directed = FALSE)
+
+# Create the Middle graph containing Central America and Venezuela
+UL <- data.frame(
+  from = c("Central America"),
+  to = c("Venezuela")
+)
+UG <- graph_from_data_frame(d = UL, directed = FALSE)
+
+# Create the Combined Graph
+UG <- graph.union(NAG, SAG, UG)
+
+# Plot the Combined Graph
+plot(UG)
+```
