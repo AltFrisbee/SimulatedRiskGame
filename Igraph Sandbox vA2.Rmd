@@ -1,0 +1,109 @@
+---
+title: "Igraph Sandbox"
+author: "Edward Prisbrey"
+date: "6/18/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+library(igraph)
+```
+
+```{r test1}
+
+North.America <- c("Alaska", "Northwest Territory", "Greenland", "Alberta", "Ontario", "Eastern Canada", "Western United States", "Eastern United States", "Central America")
+
+NAG <- make_empty_graph(length(North.America))
+V(NAG)$name <- North.America
+
+
+NAC <- data.frame(
+  from = c("Alaska", "Alaska", "Northwest Territory", "Northwest Territory", "Northwest Territory", "Alberta", "Alberta", "Ontario", "Ontario", "Ontario", "Ontario", "Eastern Canada", "Eastern Canada", "Western United States", "Western United States", "Eastern United States"), 
+  to = c("Alberta", "Northwest Territory", "Alberta", "Greenland", "Ontario", "Ontario", "Western United States", "Western United States", "Eastern United States", "Eastern Canada", "Greenland", "Greenland", "Eastern United States", "Eastern United States", "Central America", "Central America")
+)
+
+NAG <- graph_from_data_frame(d=NAC, directed=F)
+
+# plot it
+plot(NAG, layout=layout.circle, main='North America')
+```
+
+```{r sizeAndUnits}
+library(igraph)
+
+NAL <- data.frame(
+  from = c("Alaska", "Alaska", "Northwest Territory", "Northwest Territory", "Northwest Territory", "Alberta", "Alberta", "Ontario", "Ontario", "Ontario", "Ontario", "Eastern Canada", "Eastern Canada", "Western United States", "Western United States", "Eastern United States"), 
+  to = c("Alberta", "Northwest Territory", "Alberta", "Greenland", "Ontario", "Ontario", "Western United States", "Western United States", "Eastern United States", "Eastern Canada", "Greenland", "Greenland", "Eastern United States", "Eastern United States", "Central America", "Central America")
+)
+
+NAG <- graph_from_data_frame(d = NAL, directed = FALSE)
+
+# Generate sample data for number of units
+set.seed(42)
+army_units <- sample(5:50, vcount(NAG), replace = TRUE)
+names(army_units) <- V(NAG)$name
+
+# army_units <- army_units / min(army_units)
+# army_units <- army_units * 15
+
+node_size <- ( (army_units - min(army_units)) /(   max(army_units)-min(army_units)) )*(55 - 15) + 15
+
+# Plot the graph with attributes
+plot(NAG, layout = layout.fruchterman.reingold, main = 'North America', vertex.size=node_size)
+```
+
+```{r combiningGraphs}
+library(igraph)
+library(magrittr)
+
+L1 <- data.frame(source=c(LETTERS[1:4]), target=c(LETTERS[2:5]))
+G1 <- graph_from_data_frame(d=L1, directed=F)
+
+UL <- data.frame(source=c(LETTERS[1:3]), target=c((1:3)))
+UG <- graph_from_data_frame(d=UL, directed=F)
+
+L2 <- data.frame(source=c(0:8), target=c(1:9))
+G2 <- graph_from_data_frame(d=L2, directed=F)
+
+CG <- graph.union(G1, UG, G2)
+
+plot(G1)
+plot(UG)
+plot(G2)
+plot(CG)
+```
+
+```{r Combining South and North America}
+# Load required library
+library(igraph)
+
+# Create the North America graph
+NAC <- data.frame(
+  from = c("Alaska", "Alaska", "Northwest Territory", "Northwest Territory", "Northwest Territory", "Alberta", "Alberta", "Ontario", "Ontario", "Ontario", "Ontario", "Eastern Canada", "Eastern Canada", "Western United States", "Western United States", "Eastern United States"), 
+  to = c("Alberta", "Northwest Territory", "Alberta", "Greenland", "Ontario", "Ontario", "Western United States", "Western United States", "Eastern United States", "Eastern Canada", "Greenland", "Greenland", "Eastern United States", "Eastern United States", "Central America", "Central America")
+)
+
+NAG <- graph_from_data_frame(d=NAC, directed=F)
+
+# Create the South America graph excluding Central America
+SAL <- data.frame(
+  from = c("Venezuela", "Brazil", "Brazil", "Peru", "Venezuela"),
+  to = c("Brazil", "Peru", "Argentina", "Argentina", "Peru")
+)
+SAG <- graph_from_data_frame(d = SAL, directed = FALSE)
+
+# Create the Middle graph containing Central America and Venezuela
+UL <- data.frame(
+  from = c("Central America"),
+  to = c("Venezuela")
+)
+UG <- graph_from_data_frame(d = UL, directed = FALSE)
+
+# Create the Combined Graph
+UG <- graph.union(NAG, SAG, UG)
+
+# Plot the Combined Graph
+plot(UG)
+```
